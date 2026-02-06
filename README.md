@@ -1,157 +1,106 @@
-# Comic Book Collector App
+# Comic Catalog
 
-A modern web application for managing your comic book collection, built with React, TypeScript, and Tailwind CSS.
+A local-only comic book collection manager that runs on Web (PWA), Mobile (iOS/Android), and Desktop.
+
+**No backend. No login. No cloud sync.** Your data stays on your device.
+
+## Architecture
+
+```
+comic-catalog/
+├── apps/
+│   ├── web/         # Next.js 14 PWA (IndexedDB via Dexie)
+│   ├── mobile/      # Expo React Native (SQLite via expo-sqlite)
+│   └── desktop/     # Tauri v2 wrapper for the web build
+├── packages/
+│   ├── core/        # Zod schemas, types, repository interface
+│   ├── ui/          # Shared React context (RepositoryContext)
+│   ├── repo/        # Platform-specific repository implementations
+│   └── utils/       # ZIP import/export utilities
+├── turbo.json
+└── pnpm-workspace.yaml
+```
 
 ## Features
 
-### Collection Management
-- Add, edit, and delete comics from your collection
-- Store detailed information including title, issue number, series, publisher, author, artist, and more
-- Grade comics using standard comic grading scales
-- Add custom tags and notes to organize your collection
+- **Library**: Grid/list view, search, filters (series, publisher, tags, location, missing cover/barcode)
+- **Add/Edit Comic**: Full form with series, issue, variant, publisher, date, creators, condition, price, location, notes, tags, barcode
+- **Barcode Scanning** (mobile): Scan UPC/EAN via camera with haptic feedback, auto-lookup
+- **Cover Images**: Upload/capture on all platforms, stored locally
+- **Import/Export**: ZIP backup containing data.json + images folder
+- **Installable PWA**: Works offline after first load
 
-### CBZ File Reader
-- Upload and store CBZ (Comic Book ZIP) files
-- Built-in reader with page navigation
-- Keyboard shortcuts for easy reading (Arrow keys to navigate, ESC to close)
-- Fullscreen reading experience
+## Data Storage
 
-### Search & Filter
-- Search across title, series, author, and publisher
-- Advanced filtering by publisher, series, and author
-- Real-time search results
-- Clear visual indication of active filters
+| Platform | Storage |
+|----------|---------|
+| Web PWA  | IndexedDB (Dexie) |
+| Mobile   | SQLite (expo-sqlite) |
+| Desktop  | IndexedDB (via web build in Tauri) |
 
-### API Integration
-- Search for comic metadata using the Comic Vine API (mock data included for demo)
-- Auto-populate comic details from search results
-- Fetch cover images and descriptions
+## Prerequisites
 
-### Additional Features
-- Dark mode support
-- Responsive design for all screen sizes
-- Persistent storage using IndexedDB (via localforage)
-- Clean, modern UI with Tailwind CSS
+- Node.js 18+
+- pnpm 9+
+- For mobile: Expo CLI, iOS Simulator / Android Emulator
+- For desktop: Rust toolchain, Tauri CLI
 
 ## Getting Started
 
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd MST
+# Install dependencies
+pnpm install
+
+# Run web app
+pnpm dev:web
+
+# Run mobile app
+pnpm dev:mobile
+
+# Run desktop app (requires Rust + Tauri CLI)
+pnpm dev:desktop
 ```
 
-2. Install dependencies:
-```bash
-npm install
+## Scripts
+
+| Script | Description |
+|--------|-------------|
+| `pnpm dev:web` | Start Next.js dev server on port 3000 |
+| `pnpm dev:mobile` | Start Expo dev server |
+| `pnpm dev:desktop` | Start Tauri desktop app |
+| `pnpm build` | Build all packages |
+| `pnpm build:web` | Build web app for production |
+| `pnpm lint` | Run linting across all packages |
+| `pnpm typecheck` | Run TypeScript type checking |
+
+## Data Model
+
+### Items
+Core comic book record with: series, issueNumber, variant, publisher, releaseDate, writers, artists, condition, purchasePrice, location, notes, barcode, coverImageId.
+
+### Tags
+Simple name-based tags with many-to-many relationship to items.
+
+### Images
+Cover images stored platform-specifically (IndexedDB blobs for web, filesystem for mobile/desktop).
+
+## Import/Export Format
+
+Exports a ZIP file containing:
+```
+backup.zip
+├── data.json          # Items, tags, item_tags, images metadata
+└── images/
+    ├── <imageId>.jpg
+    └── <imageId>.png
 ```
 
-3. Start the development server:
-```bash
-npm run dev
-```
+## Platform Notes
 
-4. Open your browser and navigate to `http://localhost:5173`
-
-### Building for Production
-
-```bash
-npm run build
-```
-
-The built files will be in the `dist` directory.
-
-## Usage
-
-### Adding a Comic
-
-1. Click the "Add Comic" button in the header
-2. Fill in the comic details (title is required)
-3. Optionally use the "Search Comic Database" feature to auto-populate fields
-4. Upload a CBZ file if you have a digital copy
-5. Click "Add Comic" to save
-
-### Reading a Comic
-
-1. Click on any comic card to view details
-2. If a CBZ file is attached, click "Read Comic"
-3. Use the arrow keys or navigation buttons to browse pages
-4. Press ESC to exit the reader
-
-### Searching and Filtering
-
-1. Use the search bar to find comics by title, series, author, or publisher
-2. Click "Filters" to access advanced filtering options
-3. Select specific publishers, series, or authors to narrow results
-4. Click "Clear" to reset all filters
-
-## Technology Stack
-
-- **Frontend Framework**: React 18 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **Storage**: LocalForage (IndexedDB)
-- **File Handling**: JSZip for CBZ reading
-- **HTTP Client**: Axios for API calls
-- **Routing**: React Router DOM
-
-## Project Structure
-
-```
-src/
-├── components/          # React components
-│   ├── ComicCard.tsx   # Individual comic display
-│   ├── ComicForm.tsx   # Add/edit comic form
-│   ├── ComicDetails.tsx # Detailed comic view
-│   ├── ComicReader.tsx # CBZ file reader
-│   └── SearchFilter.tsx # Search and filter UI
-├── hooks/              # Custom React hooks
-│   └── useComics.ts    # Comic collection management
-├── types/              # TypeScript type definitions
-│   └── index.ts        # All type interfaces
-├── utils/              # Utility functions
-│   ├── storage.ts      # IndexedDB storage operations
-│   ├── comicReader.ts  # CBZ file reading
-│   └── comicAPI.ts     # API integration
-├── App.tsx             # Main application component
-└── main.tsx            # Application entry point
-```
-
-## API Integration
-
-The app includes mock data for demonstration purposes. To use real data from Comic Vine:
-
-1. Get an API key from [Comic Vine](https://comicvine.gamespot.com/api/)
-2. Update the `comicAPI.ts` file to use your API key
-3. Note: You may need a proxy server to avoid CORS issues
-
-## Browser Support
-
-- Chrome/Edge (latest)
-- Firefox (latest)
-- Safari (latest)
-
-## Future Enhancements
-
-- User authentication and cloud sync
-- Export/import collection data
-- Wishlist functionality
-- Price tracking and valuation
-- Series completion tracking
-- Mobile app versions
-- CBR (RAR) file support
-- Multiple reading modes (single page, double page)
+- **Web PWA**: Installable via browser. Service worker caches app shell for offline use. Data persists in IndexedDB.
+- **Mobile**: Uses expo-camera for barcode scanning and expo-image-picker for cover photos. SQLite database stored in app documents directory.
+- **Desktop**: Tauri wraps the web build. Uses the same IndexedDB storage as the web version.
 
 ## License
 
-MIT License
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+Private project.

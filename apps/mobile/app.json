@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Comic Catalog",
+    "slug": "comic-catalog",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#4c6ef5"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.comiccatalog.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4c6ef5"
+      },
+      "package": "com.comiccatalog.app"
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-image-picker",
+      "expo-sqlite"
+    ]
+  }
+}

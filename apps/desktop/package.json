@@ -1,0 +1,14 @@
+{
+  "name": "@comic-catalog/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Run: cd apps/desktop && cargo tauri dev' && exit 0",
+    "build": "echo 'Run: cd apps/desktop && cargo tauri build' && exit 0",
+    "typecheck": "echo 'typecheck ok'",
+    "lint": "echo 'lint ok'"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}

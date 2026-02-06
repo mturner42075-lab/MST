@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/vscode-tauri/main/schemas/tauri-v2.schema.json",
+  "productName": "Comic Catalog",
+  "version": "0.1.0",
+  "identifier": "com.comiccatalog.desktop",
+  "build": {
+    "frontendDist": "../../web/.next",
+    "devUrl": "http://localhost:3000",
+    "beforeDevCommand": "cd ../../ && pnpm dev:web",
+    "beforeBuildCommand": "cd ../../ && pnpm build:web"
+  },
+  "app": {
+    "title": "Comic Catalog",
+    "windows": [
+      {
+        "title": "Comic Catalog",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png"
+    ]
+  }
+}
