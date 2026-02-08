@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Harry Styles - Public Domain Photo Gallery</title>
+  <title>Brandon Lee - Public Domain Photo Gallery</title>
   <style>
     *,
     *::before,
@@ -304,10 +304,10 @@
   <a href="#gallery" class="skip-link">Skip to gallery</a>
 
   <header>
-    <h1>Harry Styles Photo Gallery</h1>
+    <h1>Brandon Lee Photo Gallery</h1>
     <p>
-      Freely licensed photos sourced from
-      <a href="https://commons.wikimedia.org/wiki/Category:Harry_Styles" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.
+      Freely licensed photos of Brandon Lee, son of Bruce Lee, sourced from
+      <a href="https://commons.wikimedia.org/wiki/Category:Brandon_Lee" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.
     </p>
     <div class="notice" role="note">
       All images are available under Creative Commons or similar free licenses.
@@ -321,7 +321,7 @@
       <p>Loading images from Wikimedia Commons&hellip;</p>
     </div>
 
-    <div id="gallery" class="gallery" role="list" aria-label="Harry Styles photo gallery"></div>
+    <div id="gallery" class="gallery" role="list" aria-label="Brandon Lee photo gallery"></div>
   </main>
 
   <div class="lightbox" id="lightbox" role="dialog" aria-label="Image preview" aria-modal="true">
@@ -335,16 +335,14 @@
   <footer>
     <p>
       Images sourced from
-      <a href="https://commons.wikimedia.org/wiki/Category:Harry_Styles" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.
+      <a href="https://commons.wikimedia.org/wiki/Category:Brandon_Lee" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>.
       All images are used under their respective free licenses.
     </p>
   </footer>
 
   <script>
     const CATEGORIES = [
-      'Category:Harry_Styles',
-      'Category:Harry_Styles_in_2012',
-      'Category:Harry_Styles_in_2015'
+      'Category:Brandon_Lee'
     ];
 
     const API_BASE = 'https://commons.wikimedia.org/w/api.php';
@@ -473,7 +471,7 @@
         srAnnounce.setAttribute('aria-live', 'polite');
         srAnnounce.className = 'sr-announce';
         srAnnounce.style.cssText = 'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);';
-        srAnnounce.textContent = `Loaded ${images.length} photos of Harry Styles.`;
+        srAnnounce.textContent = `Loaded ${images.length} photos of Brandon Lee.`;
         document.body.appendChild(srAnnounce);
 
         for (const img of images) {
@@ -497,7 +495,7 @@
 
           const imgEl = document.createElement('img');
           imgEl.src = img.thumbUrl;
-          imgEl.alt = `Photo of Harry Styles: ${img.displayTitle}`;
+          imgEl.alt = `Photo of Brandon Lee: ${img.displayTitle}`;
           imgEl.loading = 'lazy';
           imgEl.dataset.loaded = 'false';
           imgEl.addEventListener('load', function() {
@@ -546,7 +544,7 @@
       const lbCaption = document.getElementById('lightbox-caption');
 
       lbImg.src = img.fullUrl;
-      lbImg.alt = `Photo of Harry Styles: ${img.displayTitle}`;
+      lbImg.alt = `Photo of Brandon Lee: ${img.displayTitle}`;
       lbCaption.innerHTML = `
         <strong>${escapeHtml(img.displayTitle)}</strong><br>
         ${escapeHtml(img.license)} &mdash; ${escapeHtml(img.author)}<br>
