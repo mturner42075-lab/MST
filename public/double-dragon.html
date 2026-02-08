@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Dragon - HTML Edition</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    color: #fff;
+  }
+  #gameContainer {
+    position: relative;
+    border: 3px solid #c33;
+    box-shadow: 0 0 30px rgba(204, 51, 51, 0.5);
+  }
+  canvas { display: block; }
+  #overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.85);
+    z-index: 10;
+  }
+  #overlay.hidden { display: none; }
+  #overlay h1 {
+    font-size: 48px;
+    color: #e33;
+    text-shadow: 3px 3px 0 #600, 0 0 20px rgba(255,50,50,0.7);
+    letter-spacing: 4px;
+    margin-bottom: 8px;
+  }
+  #overlay h2 {
+    font-size: 20px;
+    color: #f90;
+    margin-bottom: 30px;
+    text-shadow: 0 0 10px rgba(255,153,0,0.5);
+  }
+  #overlay .info {
+    font-size: 14px;
+    color: #aaa;
+    margin: 4px 0;
+  }
+  #overlay .info span { color: #ff0; }
+  #overlay .start-msg {
+    margin-top: 30px;
+    font-size: 20px;
+    color: #fff;
+    animation: blink 1s infinite;
+  }
+  #overlay .score-display {
+    font-size: 22px;
+    color: #0f0;
+    margin: 10px 0;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+  #controls-hint {
+    margin-top: 12px;
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+  }
+  #mobileControls {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 10px;
+    z-index: 20;
+  }
+  #mobileControls .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dpad {
+    display: grid;
+    grid-template-columns: 50px 50px 50px;
+    grid-template-rows: 50px 50px 50px;
+    gap: 2px;
+  }
+  .dpad button, .action-btn {
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    border-radius: 8px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .dpad button:active, .action-btn:active {
+    background: rgba(255,255,255,0.35);
+  }
+  .action-btn {
+    width: 60px;
+    height: 60px;
+    margin: 4px;
+    font-size: 14px;
+  }
+  .dpad .empty { visibility: hidden; }
+  @media (pointer: coarse) {
+    #mobileControls { display: block; }
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <canvas id="game"></canvas>
+  <div id="overlay">
+    <h1>DOUBLE DRAGON</h1>
+    <h2>HTML Edition</h2>
+    <div class="info"><span>Arrow Keys / WASD</span> - Move</div>
+    <div class="info"><span>Z / J</span> - Punch</div>
+    <div class="info"><span>X / K</span> - Kick</div>
+    <div class="info"><span>C / Space</span> - Jump</div>
+    <div class="info"><span>Z+C</span> - Jump Kick (while jumping)</div>
+    <div class="start-msg">PRESS ENTER TO START</div>
+  </div>
+</div>
+<div id="controls-hint">Optimized for keyboard. Mobile touch controls available on touch devices.</div>
+
+<div id="mobileControls">
+  <div class="row">
+    <div class="dpad">
+      <div class="empty"></div>
+      <button data-key="ArrowUp">&#9650;</button>
+      <div class="empty"></div>
+      <button data-key="ArrowLeft">&#9664;</button>
+      <div class="empty"></div>
+      <button data-key="ArrowRight">&#9654;</button>
+      <div class="empty"></div>
+      <button data-key="ArrowDown">&#9660;</button>
+      <div class="empty"></div>
+    </div>
+    <div>
+      <div class="row">
+        <button class="action-btn" data-key="c">JUMP</button>
+        <button class="action-btn" data-key="z">PUNCH</button>
+      </div>
+      <div class="row">
+        <button class="action-btn" data-key="Enter" style="width:128px">START</button>
+        <button class="action-btn" data-key="x">KICK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DOUBLE DRAGON - HTML Canvas Beat-em-up
+// ============================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const overlay = document.getElementById('overlay');
+
+const W = 800, H = 450;
+canvas.width = W;
+canvas.height = H;
+
+// --- CONSTANTS ---
+const GROUND_Y = 340;
+const LANE_MIN = 280;
+const LANE_MAX = 400;
+const GRAVITY = 0.6;
+const SCROLL_SPEED = 2;
+const LEVEL_WIDTH = 4800;
+
+// --- GAME STATE ---
+let gameState = 'title'; // title, playing, gameover, victory
+let score = 0;
+let wave = 0;
+let cameraX = 0;
+let shakeTimer = 0;
+let shakeIntensity = 0;
+let particles = [];
+let floatingTexts = [];
+let frameCount = 0;
+
+// --- INPUT ---
+const keys = {};
+const justPressed = {};
+window.addEventListener('keydown', e => {
+  if (!keys[e.key]) justPressed[e.key] = true;
+  keys[e.key] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Mobile touch
+document.querySelectorAll('[data-key]').forEach(btn => {
+  const key = btn.dataset.key;
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (!keys[key]) justPressed[key] = true;
+    keys[key] = true;
+  });
+  btn.addEventListener('touchend', e => {
+    e.preventDefault();
+    keys[key] = false;
+  });
+});
+
+// --- COLORS ---
+const COLORS = {
+  playerBody: '#2266cc',
+  playerSkin: '#f4c890',
+  playerHair: '#3a1a00',
+  playerPants: '#1a3a7a',
+  playerShoes: '#4a2a00',
+  enemyBody: '#cc2222',
+  enemySkin: '#e8b878',
+  enemyHair: '#222',
+  enemyPants: '#7a1a1a',
+  bossBody: '#8822aa',
+  bossSkin: '#e8b878',
+  bossHair: '#ff0',
+};
+
+// --- SPRITE DRAWING ---
+function drawCharacter(x, y, facing, palette, state, frame, isHurt, scale = 1) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(facing * scale, scale);
+
+  const bobY = (state === 'walk') ? Math.sin(frame * 0.3) * 2 : 0;
+  const hurtFlash = isHurt && (frameCount % 4 < 2);
+
+  if (hurtFlash) {
+    ctx.globalAlpha = 0.5;
+  }
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(0, 24, 18 * scale, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (state === 'punch') {
+    // Punching arm extended
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(10, -14 + bobY, 22, 8);
+    // Fist
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(30, -16 + bobY, 8, 10);
+  } else if (state === 'kick') {
+    // Kicking leg extended
+    ctx.fillStyle = palette.shoes || '#4a2a00';
+    ctx.fillRect(10, 6 + bobY, 24, 8);
+    ctx.fillStyle = palette.pants;
+    ctx.fillRect(6, 4 + bobY, 12, 10);
+  } else if (state === 'jumpkick') {
+    // Aerial kick
+    ctx.fillStyle = palette.shoes || '#4a2a00';
+    ctx.fillRect(12, 0, 26, 7);
+    ctx.fillStyle = palette.pants;
+    ctx.fillRect(6, -2, 14, 10);
+  }
+
+  // Legs
+  if (state !== 'kick' && state !== 'jumpkick') {
+    const legSpread = (state === 'walk') ? Math.sin(frame * 0.3) * 6 : 0;
+    ctx.fillStyle = palette.pants;
+    ctx.fillRect(-6 + legSpread, 6 + bobY, 8, 16);
+    ctx.fillRect(-2 - legSpread, 6 + bobY, 8, 16);
+    // Shoes
+    ctx.fillStyle = palette.shoes || '#4a2a00';
+    ctx.fillRect(-7 + legSpread, 20 + bobY, 10, 5);
+    ctx.fillRect(-3 - legSpread, 20 + bobY, 10, 5);
+  }
+
+  // Body / torso
+  ctx.fillStyle = palette.body;
+  ctx.fillRect(-10, -16 + bobY, 20, 24);
+  // Belt
+  ctx.fillStyle = '#222';
+  ctx.fillRect(-10, 4 + bobY, 20, 3);
+
+  // Arms (non-punching)
+  if (state !== 'punch') {
+    const armSwing = (state === 'walk') ? Math.sin(frame * 0.3) * 4 : 0;
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(-14, -12 + bobY + armSwing, 6, 14);
+    ctx.fillRect(8, -12 + bobY - armSwing, 6, 14);
+  } else {
+    // Back arm
+    ctx.fillStyle = palette.skin;
+    ctx.fillRect(-14, -12 + bobY, 6, 14);
+  }
+
+  // Head
+  ctx.fillStyle = palette.skin;
+  ctx.fillRect(-8, -30 + bobY, 16, 16);
+  // Hair
+  ctx.fillStyle = palette.hair;
+  ctx.fillRect(-9, -32 + bobY, 18, 6);
+  ctx.fillRect(-9, -32 + bobY, 4, 12);
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(-4, -26 + bobY, 4, 3);
+  ctx.fillRect(2, -26 + bobY, 4, 3);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(-2, -26 + bobY, 2, 3);
+  ctx.fillRect(4, -26 + bobY, 2, 3);
+  // Mouth
+  if (isHurt) {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-3, -21 + bobY, 6, 2);
+  }
+
+  ctx.restore();
+}
+
+// --- ENTITY BASE ---
+function createEntity(x, y, opts = {}) {
+  return {
+    x, y,
+    laneY: y,
+    vx: 0, vy: 0,
+    w: opts.w || 30,
+    h: opts.h || 50,
+    hp: opts.hp || 100,
+    maxHp: opts.hp || 100,
+    facing: opts.facing || 1,
+    speed: opts.speed || 2.5,
+    state: 'idle',
+    stateTimer: 0,
+    attackTimer: 0,
+    hurtTimer: 0,
+    onGround: true,
+    jumpVel: -11,
+    frame: 0,
+    alive: true,
+    ...opts,
+  };
+}
+
+// --- PLAYER ---
+let player;
+function createPlayer() {
+  return createEntity(100, GROUND_Y, {
+    hp: 200,
+    maxHp: 200,
+    speed: 3,
+    punchDmg: 12,
+    kickDmg: 18,
+    jumpKickDmg: 25,
+    comboCount: 0,
+    comboTimer: 0,
+    lives: 3,
+    invincible: 0,
+    palette: {
+      body: COLORS.playerBody,
+      skin: COLORS.playerSkin,
+      hair: COLORS.playerHair,
+      pants: COLORS.playerPants,
+      shoes: COLORS.playerShoes,
+    }
+  });
+}
+
+// --- ENEMIES ---
+let enemies = [];
+
+const ENEMY_TYPES = {
+  thug: {
+    hp: 60, speed: 1.2, dmg: 10, score: 100, aggroRange: 180,
+    palette: { body: '#cc2222', skin: '#e8b878', hair: '#222', pants: '#7a1a1a', shoes: '#333' }
+  },
+  brawler: {
+    hp: 90, speed: 1.0, dmg: 15, score: 200, aggroRange: 150,
+    palette: { body: '#cc8822', skin: '#e8b878', hair: '#553300', pants: '#665522', shoes: '#442200' }
+  },
+  ninja: {
+    hp: 50, speed: 2.2, dmg: 12, score: 250, aggroRange: 220,
+    palette: { body: '#224422', skin: '#d8a868', hair: '#111', pants: '#1a3a1a', shoes: '#111' }
+  },
+  boss: {
+    hp: 300, speed: 0.8, dmg: 25, score: 1000, aggroRange: 250, w: 38, h: 60,
+    palette: { body: '#8822aa', skin: '#e8b878', hair: '#ff0', pants: '#441166', shoes: '#220044' }
+  }
+};
+
+function createEnemy(x, y, type) {
+  const t = ENEMY_TYPES[type];
+  return createEntity(x, y, {
+    hp: t.hp,
+    speed: t.speed,
+    dmg: t.dmg,
+    scoreVal: t.score,
+    aggroRange: t.aggroRange,
+    palette: t.palette,
+    type: type,
+    w: t.w || 30,
+    h: t.h || 50,
+    aiState: 'idle',
+    aiTimer: 0,
+    scale: type === 'boss' ? 1.3 : 1,
+  });
+}
+
+// --- WAVE DEFINITIONS ---
+const WAVES = [
+  { enemies: [['thug', 200], ['thug', 400]], scrollTo: 0 },
+  { enemies: [['thug', 700], ['thug', 850], ['thug', 950]], scrollTo: 500 },
+  { enemies: [['brawler', 1300], ['thug', 1450], ['thug', 1550]], scrollTo: 1000 },
+  { enemies: [['ninja', 1800], ['ninja', 1950], ['brawler', 2100]], scrollTo: 1500 },
+  { enemies: [['thug', 2500], ['brawler', 2650], ['ninja', 2750], ['thug', 2850]], scrollTo: 2200 },
+  { enemies: [['ninja', 3200], ['ninja', 3350], ['brawler', 3450], ['brawler', 3550]], scrollTo: 2900 },
+  { enemies: [['thug', 3900], ['brawler', 4000], ['ninja', 4100], ['ninja', 4150], ['brawler', 4250]], scrollTo: 3600 },
+  { enemies: [['boss', 4400]], scrollTo: 4000 },
+];
+
+let currentWaveEnemiesDead = 0;
+let currentWaveEnemiesTotal = 0;
+let waveTransition = 0;
+let targetCameraX = 0;
+let goArrowTimer = 0;
+let showGoArrow = false;
+
+// --- PARTICLES ---
+function spawnParticle(x, y, color, count = 5) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 6,
+      vy: -Math.random() * 4 - 2,
+      life: 20 + Math.random() * 15,
+      maxLife: 35,
+      color,
+      size: 2 + Math.random() * 3,
+    });
+  }
+}
+
+function spawnFloatingText(x, y, text, color = '#fff') {
+  floatingTexts.push({ x, y, text, color, life: 50, vy: -1.5 });
+}
+
+// --- BACKGROUND DRAWING ---
+function drawBackground() {
+  // Sky gradient
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#1a0a2e');
+  grad.addColorStop(0.4, '#2d1b4e');
+  grad.addColorStop(0.7, '#4a2a5a');
+  grad.addColorStop(1, '#1a1a2e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Stars (parallax)
+  ctx.fillStyle = '#fff';
+  const starSeed = [23, 87, 142, 203, 267, 321, 398, 456, 512, 578, 634, 701, 45, 123, 234, 345, 456, 567];
+  for (let i = 0; i < starSeed.length; i++) {
+    const sx = ((starSeed[i] * 3 + i * 73) % (W + 200)) - cameraX * 0.05 % (W + 200);
+    const sy = (starSeed[i] * 7 + i * 31) % (H * 0.4);
+    ctx.globalAlpha = 0.3 + (Math.sin(frameCount * 0.05 + i) + 1) * 0.3;
+    ctx.fillRect(((sx % (W + 200)) + W + 200) % (W + 200) - 100, sy, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+
+  // Distant buildings (parallax layer 1)
+  const bldgColors = ['#1a1a30', '#22223a', '#181830'];
+  for (let i = 0; i < 20; i++) {
+    const bx = (i * 160 - cameraX * 0.15) % (20 * 160);
+    const bw = 60 + (i * 37) % 80;
+    const bh = 60 + (i * 53) % 100;
+    ctx.fillStyle = bldgColors[i % 3];
+    ctx.fillRect(bx, LANE_MIN - bh + 60, bw, bh + 100);
+    // Windows
+    ctx.fillStyle = (frameCount + i * 7) % 120 < 80 ? '#ffcc44' : '#554400';
+    for (let wy = 0; wy < bh - 20; wy += 18) {
+      for (let wx = 8; wx < bw - 8; wx += 16) {
+        if ((i * 7 + wy + wx) % 3 !== 0) {
+          ctx.fillRect(bx + wx, LANE_MIN - bh + 70 + wy, 8, 10);
+        }
+      }
+    }
+  }
+
+  // Mid-ground buildings (parallax layer 2)
+  for (let i = 0; i < 30; i++) {
+    const bx = (i * 110 - cameraX * 0.35);
+    if (bx < -120 || bx > W + 20) continue;
+    const bw = 50 + (i * 41) % 60;
+    const bh = 40 + (i * 67) % 80;
+    ctx.fillStyle = '#111122';
+    ctx.fillRect(bx, LANE_MIN - bh + 90, bw, bh + 60);
+  }
+
+  // Ground
+  ctx.fillStyle = '#3a3a4a';
+  ctx.fillRect(0, LANE_MIN + 10, W, H - LANE_MIN);
+
+  // Road/floor area
+  const floorGrad = ctx.createLinearGradient(0, LANE_MIN + 10, 0, H);
+  floorGrad.addColorStop(0, '#4a4a55');
+  floorGrad.addColorStop(0.3, '#3a3a45');
+  floorGrad.addColorStop(1, '#2a2a35');
+  ctx.fillStyle = floorGrad;
+  ctx.fillRect(0, LANE_MIN + 10, W, H - LANE_MIN);
+
+  // Ground line markings
+  ctx.strokeStyle = '#555';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    const lx = (i * 120 - cameraX * 0.9) % (40 * 120);
+    ctx.beginPath();
+    ctx.moveTo(lx, LANE_MAX + 20);
+    ctx.lineTo(lx + 40, LANE_MAX + 20);
+    ctx.stroke();
+  }
+
+  // Street lamps
+  for (let i = 0; i < 20; i++) {
+    const lx = i * 300 - cameraX * 0.9;
+    if (lx < -30 || lx > W + 30) continue;
+    ctx.fillStyle = '#444';
+    ctx.fillRect(lx, LANE_MIN - 60, 4, 80);
+    ctx.fillStyle = '#666';
+    ctx.fillRect(lx - 8, LANE_MIN - 62, 20, 6);
+    // Light glow
+    ctx.fillStyle = 'rgba(255,220,100,0.08)';
+    ctx.beginPath();
+    ctx.arc(lx + 2, LANE_MIN - 40, 50, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // "GO" arrow
+  if (showGoArrow) {
+    goArrowTimer++;
+    const ax = W - 60 + Math.sin(goArrowTimer * 0.1) * 10;
+    ctx.fillStyle = `rgba(255,255,0,${0.5 + Math.sin(goArrowTimer * 0.15) * 0.3})`;
+    ctx.font = 'bold 28px Courier New';
+    ctx.fillText('GO \u25B6', ax, LANE_MIN);
+  }
+}
+
+// --- HUD ---
+function drawHUD() {
+  // Player health bar
+  ctx.fillStyle = '#222';
+  ctx.fillRect(15, 15, 204, 22);
+  ctx.fillStyle = '#333';
+  ctx.fillRect(17, 17, 200, 18);
+  const hpRatio = player.hp / player.maxHp;
+  const hpColor = hpRatio > 0.5 ? '#22cc44' : hpRatio > 0.25 ? '#ccaa22' : '#cc2222';
+  ctx.fillStyle = hpColor;
+  ctx.fillRect(17, 17, 200 * hpRatio, 18);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px Courier New';
+  ctx.fillText('BILLY', 20, 30);
+
+  // Lives
+  for (let i = 0; i < player.lives; i++) {
+    ctx.fillStyle = '#f44';
+    ctx.fillRect(225 + i * 18, 19, 12, 14);
+    ctx.fillStyle = '#faa';
+    ctx.fillRect(228 + i * 18, 19, 6, 8);
+  }
+
+  // Score
+  ctx.fillStyle = '#ff0';
+  ctx.font = 'bold 16px Courier New';
+  ctx.textAlign = 'right';
+  ctx.fillText('SCORE: ' + String(score).padStart(7, '0'), W - 20, 30);
+  ctx.textAlign = 'left';
+
+  // Wave
+  ctx.fillStyle = '#aaa';
+  ctx.font = '12px Courier New';
+  ctx.fillText('WAVE ' + (wave + 1) + '/' + WAVES.length, W / 2 - 40, 28);
+
+  // Enemy health bars
+  enemies.forEach(e => {
+    if (!e.alive) return;
+    const ex = e.x - cameraX;
+    const barW = e.type === 'boss' ? 80 : 40;
+    ctx.fillStyle = '#222';
+    ctx.fillRect(ex - barW/2 - 1, e.laneY - e.h - 14, barW + 2, 7);
+    ctx.fillStyle = e.type === 'boss' ? '#aa22ff' : '#cc2222';
+    ctx.fillRect(ex - barW/2, e.laneY - e.h - 13, barW * (e.hp / e.maxHp), 5);
+    if (e.type === 'boss') {
+      ctx.fillStyle = '#ff0';
+      ctx.font = 'bold 10px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText('BOSS', ex, e.laneY - e.h - 18);
+      ctx.textAlign = 'left';
+    }
+  });
+
+  // Wave transition text
+  if (waveTransition > 0) {
+    ctx.fillStyle = `rgba(255,255,0,${Math.min(1, waveTransition / 30)})`;
+    ctx.font = 'bold 32px Courier New';
+    ctx.textAlign = 'center';
+    if (wave < WAVES.length) {
+      ctx.fillText('WAVE ' + (wave + 1), W / 2, H / 2 - 20);
+      if (WAVES[wave].enemies[0] && WAVES[wave].enemies[0][0] === 'boss') {
+        ctx.fillStyle = '#f0f';
+        ctx.fillText('BOSS FIGHT!', W / 2, H / 2 + 20);
+      }
+    }
+    ctx.textAlign = 'left';
+    waveTransition--;
+  }
+}
+
+// --- COMBAT ---
+function getAttackBox(entity, range) {
+  const fx = entity.facing;
+  return {
+    x: entity.x + fx * 10,
+    y: entity.laneY - entity.h,
+    w: range * fx,
+    h: entity.h,
+  };
+}
+
+function boxOverlap(a, b) {
+  const ax = Math.min(a.x, a.x + a.w);
+  const aw = Math.abs(a.w);
+  const bx = b.x - b.w / 2;
+  const bw = b.w;
+  return ax < bx + bw && ax + aw > bx && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function hitEntity(target, dmg, attacker) {
+  if (target.hurtTimer > 0 || target.invincible > 0) return false;
+  target.hp -= dmg;
+  target.hurtTimer = 15;
+  target.vx = (attacker.x < target.x ? 3 : -3);
+
+  spawnParticle(target.x, target.laneY - 20, '#ff0', 8);
+  shakeTimer = 6;
+  shakeIntensity = dmg > 20 ? 6 : 3;
+
+  if (target.hp <= 0) {
+    target.alive = false;
+    target.hp = 0;
+    spawnParticle(target.x, target.laneY - 25, '#f80', 15);
+    spawnFloatingText(target.x - cameraX, target.laneY - 50, '+' + (target.scoreVal || 0), '#ff0');
+    score += target.scoreVal || 0;
+    currentWaveEnemiesDead++;
+    return true;
+  } else {
+    spawnFloatingText(target.x - cameraX, target.laneY - 50, dmg.toString(), '#f44');
+  }
+  return false;
+}
+
+// --- PLAYER UPDATE ---
+function updatePlayer() {
+  if (!player.alive) return;
+
+  player.frame++;
+  if (player.invincible > 0) player.invincible--;
+  if (player.hurtTimer > 0) {
+    player.hurtTimer--;
+    player.x += player.vx;
+    player.vx *= 0.85;
+    player.state = 'hurt';
+    if (player.hurtTimer <= 0) player.state = 'idle';
+    return;
+  }
+
+  if (player.comboTimer > 0) player.comboTimer--;
+  else player.comboCount = 0;
+
+  if (player.attackTimer > 0) {
+    player.attackTimer--;
+
+    // Check hits during attack frames
+    if (player.attackTimer === 6) {
+      const range = player.state === 'kick' ? 38 : player.state === 'jumpkick' ? 42 : 32;
+      const atkBox = getAttackBox(player, range);
+      enemies.forEach(e => {
+        if (!e.alive) return;
+        const eBox = { x: e.x - e.w/2, y: e.laneY - e.h, w: e.w, h: e.h };
+        // Also check lane proximity
+        if (Math.abs(e.laneY - player.laneY) > 30) return;
+        if (boxOverlap(atkBox, eBox)) {
+          let dmg;
+          if (player.state === 'jumpkick') dmg = player.jumpKickDmg;
+          else if (player.state === 'kick') dmg = player.kickDmg;
+          else dmg = player.punchDmg;
+
+          // Combo bonus
+          player.comboCount++;
+          player.comboTimer = 45;
+          if (player.comboCount > 2) {
+            dmg = Math.floor(dmg * (1 + player.comboCount * 0.15));
+            if (player.comboCount >= 4) {
+              spawnFloatingText(e.x - cameraX, e.laneY - 65, player.comboCount + ' HIT COMBO!', '#f0f');
+            }
+          }
+          hitEntity(e, dmg, player);
+        }
+      });
+    }
+
+    if (player.attackTimer <= 0) {
+      player.state = 'idle';
+    }
+    // Can still move slowly during attacks
+    handlePlayerMovement(0.3);
+    handleJumpPhysics();
+    return;
+  }
+
+  // Attacks
+  if ((justPressed['z'] || justPressed['Z'] || justPressed['j'] || justPressed['J'])) {
+    if (!player.onGround) {
+      player.state = 'jumpkick';
+      player.attackTimer = 14;
+    } else {
+      player.state = 'punch';
+      player.attackTimer = 12;
+    }
+  } else if ((justPressed['x'] || justPressed['X'] || justPressed['k'] || justPressed['K'])) {
+    player.state = 'kick';
+    player.attackTimer = 16;
+  } else if ((justPressed['c'] || justPressed['C'] || justPressed[' ']) && player.onGround) {
+    player.vy = player.jumpVel;
+    player.onGround = false;
+  }
+
+  handlePlayerMovement(1);
+  handleJumpPhysics();
+
+  if (player.attackTimer <= 0 && player.onGround) {
+    if (keys['ArrowLeft'] || keys['ArrowRight'] || keys['ArrowUp'] || keys['ArrowDown'] ||
+        keys['a'] || keys['d'] || keys['w'] || keys['s']) {
+      player.state = 'walk';
+    } else {
+      player.state = 'idle';
+    }
+  }
+
+  // Clamp to playable area
+  player.x = Math.max(cameraX + 20, Math.min(cameraX + W - 20, player.x));
+  player.laneY = Math.max(LANE_MIN, Math.min(LANE_MAX, player.laneY));
+}
+
+function handlePlayerMovement(speedMult) {
+  let dx = 0, dy = 0;
+  if (keys['ArrowLeft'] || keys['a'] || keys['A']) { dx = -1; player.facing = -1; }
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) { dx = 1; player.facing = 1; }
+  if (keys['ArrowUp'] || keys['w'] || keys['W']) dy = -1;
+  if (keys['ArrowDown'] || keys['s'] || keys['S']) dy = 1;
+
+  if (dx !== 0 && dy !== 0) {
+    dx *= 0.707;
+    dy *= 0.707;
+  }
+
+  player.x += dx * player.speed * speedMult;
+  player.laneY += dy * player.speed * speedMult * 0.7;
+}
+
+function handleJumpPhysics() {
+  if (!player.onGround) {
+    player.vy += GRAVITY;
+    player.y += player.vy;
+    if (player.y >= player.laneY) {
+      player.y = player.laneY;
+      player.vy = 0;
+      player.onGround = true;
+      if (player.state === 'jumpkick') {
+        player.state = 'idle';
+        player.attackTimer = 0;
+      }
+    }
+  } else {
+    player.y = player.laneY;
+  }
+}
+
+// --- ENEMY AI ---
+function updateEnemy(e) {
+  if (!e.alive) return;
+  e.frame++;
+  if (e.hurtTimer > 0) {
+    e.hurtTimer--;
+    e.x += e.vx;
+    e.vx *= 0.85;
+    e.state = 'hurt';
+    e.aiTimer = 30;
+    return;
+  }
+
+  const dx = player.x - e.x;
+  const dy = player.laneY - e.laneY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  e.aiTimer--;
+
+  if (e.aiTimer <= 0) {
+    if (dist < 40 && Math.abs(dy) < 20) {
+      // Close enough to attack
+      e.aiState = 'attack';
+      e.aiTimer = e.type === 'boss' ? 25 : 35;
+    } else if (dist < e.aggroRange) {
+      e.aiState = 'chase';
+      e.aiTimer = 20 + Math.random() * 30;
+    } else {
+      e.aiState = 'wander';
+      e.aiTimer = 40 + Math.random() * 60;
+      e.wanderDx = (Math.random() - 0.5) * 2;
+      e.wanderDy = (Math.random() - 0.5) * 2;
+    }
+  }
+
+  switch (e.aiState) {
+    case 'chase': {
+      const ndx = dx / (dist || 1);
+      const ndy = dy / (dist || 1);
+      e.x += ndx * e.speed;
+      e.laneY += ndy * e.speed * 0.6;
+      e.facing = dx > 0 ? 1 : -1;
+      e.state = 'walk';
+      break;
+    }
+    case 'attack': {
+      e.facing = dx > 0 ? 1 : -1;
+      if (e.attackTimer <= 0) {
+        e.state = Math.random() > 0.5 ? 'punch' : 'kick';
+        e.attackTimer = 12;
+        // Check if hits player
+        if (dist < 50 && Math.abs(dy) < 25 && player.hurtTimer <= 0 && player.invincible <= 0) {
+          hitEntity(player, e.dmg, e);
+          if (player.hp <= 0) {
+            playerDeath();
+          }
+        }
+      }
+      if (e.attackTimer > 0) e.attackTimer--;
+      if (e.attackTimer <= 0) e.state = 'idle';
+      break;
+    }
+    case 'wander': {
+      e.x += (e.wanderDx || 0) * e.speed * 0.3;
+      e.laneY += (e.wanderDy || 0) * e.speed * 0.2;
+      e.state = 'walk';
+      break;
+    }
+    default:
+      e.state = 'idle';
+  }
+
+  e.laneY = Math.max(LANE_MIN, Math.min(LANE_MAX, e.laneY));
+  e.y = e.laneY;
+}
+
+function playerDeath() {
+  player.lives--;
+  if (player.lives <= 0) {
+    player.alive = false;
+    gameState = 'gameover';
+    showOverlay('GAME OVER', 'Final Score: ' + score, 'PRESS ENTER TO RETRY');
+  } else {
+    player.hp = player.maxHp;
+    player.invincible = 90;
+    player.hurtTimer = 0;
+    spawnParticle(player.x, player.y - 20, '#0ff', 20);
+  }
+}
+
+// --- CAMERA ---
+function updateCamera() {
+  // Camera follows player
+  const targetX = player.x - W * 0.35;
+  const maxCam = Math.max(0, Math.min(LEVEL_WIDTH - W, targetX));
+
+  // During wave transitions, scroll to target
+  if (targetCameraX > cameraX) {
+    cameraX = Math.min(targetCameraX, cameraX + SCROLL_SPEED);
+  }
+  cameraX = Math.max(cameraX, 0);
+  cameraX = Math.min(maxCam, Math.max(cameraX, targetX - 50));
+  cameraX = Math.max(0, cameraX);
+}
+
+// --- WAVES ---
+function checkWaveProgress() {
+  if (wave >= WAVES.length) return;
+
+  if (currentWaveEnemiesDead >= currentWaveEnemiesTotal && enemies.every(e => !e.alive)) {
+    wave++;
+    if (wave >= WAVES.length) {
+      gameState = 'victory';
+      showOverlay('VICTORY!', 'Final Score: ' + score, 'PRESS ENTER TO PLAY AGAIN');
+      return;
+    }
+    spawnWave(wave);
+  }
+}
+
+function spawnWave(w) {
+  if (w >= WAVES.length) return;
+  const waveDef = WAVES[w];
+  currentWaveEnemiesDead = 0;
+  currentWaveEnemiesTotal = waveDef.enemies.length;
+  waveTransition = 80;
+  targetCameraX = waveDef.scrollTo;
+  showGoArrow = true;
+
+  waveDef.enemies.forEach(([type, x]) => {
+    const laneY = LANE_MIN + Math.random() * (LANE_MAX - LANE_MIN);
+    enemies.push(createEnemy(x, laneY, type));
+  });
+
+  setTimeout(() => { showGoArrow = false; }, 3000);
+}
+
+// --- PARTICLES UPDATE ---
+function updateParticles() {
+  particles = particles.filter(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.15;
+    p.life--;
+    return p.life > 0;
+  });
+  floatingTexts = floatingTexts.filter(ft => {
+    ft.y += ft.vy;
+    ft.life--;
+    return ft.life > 0;
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - cameraX, p.y, p.size, p.size);
+  });
+  ctx.globalAlpha = 1;
+  floatingTexts.forEach(ft => {
+    ctx.globalAlpha = ft.life / 50;
+    ctx.fillStyle = ft.color;
+    ctx.font = 'bold 16px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(ft.text, ft.x, ft.y);
+    ctx.textAlign = 'left';
+  });
+  ctx.globalAlpha = 1;
+}
+
+// --- OVERLAY ---
+function showOverlay(title, subtitle, action) {
+  overlay.classList.remove('hidden');
+  overlay.innerHTML = `
+    <h1>${title}</h1>
+    <h2>${subtitle}</h2>
+    <div class="score-display">SCORE: ${String(score).padStart(7, '0')}</div>
+    <div class="start-msg">${action}</div>
+  `;
+}
+
+// --- MAIN LOOP ---
+function gameLoop() {
+  frameCount++;
+
+  // Clear justPressed
+  const jp = { ...justPressed };
+  for (const k in justPressed) justPressed[k] = false;
+
+  // Handle state transitions
+  if (gameState === 'title' || gameState === 'gameover' || gameState === 'victory') {
+    if (keys['Enter']) {
+      startGame();
+    }
+    // Still draw background for ambiance
+    ctx.clearRect(0, 0, W, H);
+    drawBackground();
+    requestAnimationFrame(gameLoop);
+    return;
+  }
+
+  // Update
+  updatePlayer();
+  enemies.forEach(updateEnemy);
+  updateCamera();
+  updateParticles();
+  checkWaveProgress();
+
+  // Screen shake
+  let sx = 0, sy = 0;
+  if (shakeTimer > 0) {
+    sx = (Math.random() - 0.5) * shakeIntensity;
+    sy = (Math.random() - 0.5) * shakeIntensity;
+    shakeTimer--;
+  }
+
+  // Draw
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  drawBackground();
+
+  // Sort entities by Y for depth ordering
+  const allEntities = [player, ...enemies].filter(e => e.alive);
+  allEntities.sort((a, b) => a.laneY - b.laneY);
+
+  allEntities.forEach(e => {
+    const sx = e.x - cameraX;
+    const sy = e.onGround ? e.laneY : e.y;
+    const isPlayer = e === player;
+    const palette = e.palette;
+    const hurtFlash = e.hurtTimer > 0;
+    const invFlash = e.invincible > 0 && frameCount % 6 < 3;
+
+    if (invFlash) {
+      ctx.globalAlpha = 0.4;
+    }
+
+    drawCharacter(sx, sy, e.facing, palette, e.state, e.frame, hurtFlash, e.scale || 1);
+
+    ctx.globalAlpha = 1;
+  });
+
+  drawParticles();
+  drawHUD();
+
+  ctx.restore();
+
+  requestAnimationFrame(gameLoop);
+}
+
+function startGame() {
+  gameState = 'playing';
+  overlay.classList.add('hidden');
+  score = 0;
+  wave = 0;
+  cameraX = 0;
+  targetCameraX = 0;
+  enemies = [];
+  particles = [];
+  floatingTexts = [];
+  player = createPlayer();
+  player.y = player.laneY;
+  spawnWave(0);
+}
+
+// Start the loop
+player = createPlayer();
+gameLoop();
+</script>
+</body>
+</html>
